@@ -3,7 +3,6 @@ import sys
 import json
 import openai
 import asyncio
-from aiohttp_sse_client import client as sse_client
 
 with open('creds.json') as f:
     creds = json.load(f)
