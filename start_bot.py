@@ -4,7 +4,7 @@ import subprocess
 import time
 import pyaudio
 from openai_get_response import stream_chat_with_gpt
-from text_to_speech import special_play_audio as playaudio
+from text_to_speech import *
 from google.cloud import speech_v1
 from google.cloud.speech_v1 import types
 from google.api_core.exceptions import OutOfRange
@@ -67,12 +67,12 @@ def main():
 
             if(word_count > 26 or (len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))):
                 print("ai: " + sentence)             
-                playaudio(sentence)   
+                special_play_audio(sentence)   
                 sentence = ""
         
         if(len(sentence)> 1):
             print("ai2: " + sentence)  
-            playaudio(sentence)
+            special_play_audio(sentence)
         
         return fullResponse
                    

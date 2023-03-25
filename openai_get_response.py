@@ -11,12 +11,13 @@ with open('creds.json') as f:
 openai.api_key = creds['OPENAI_API_KEY']
 
 # Send request and stream response
-def stream_chat_with_gpt(input_string):
+def stream_chat_with_gpt(input_string, fullTranscript):
+    transcript = fullTranscript 
+    transcript.append({'role': 'user', 'content': input_string})
+
     response = openai.ChatCompletion.create(
         model='gpt-3.5-turbo',
-        messages=[
-            {'role': 'user', 'content': input_string}
-        ],
+        messages = transcript,
         temperature=0,
         stream=True  # this time, we set stream=True
     )

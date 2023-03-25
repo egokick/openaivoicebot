@@ -63,16 +63,8 @@ def special_play_audio(text):
     audio_queue = queue.Queue()
 
     text_to_speech(text, stability, similarity_boost, audio_queue)
-    play_audio(audio_queue)
-    
-    # audio_queue = queue.Queue()
-    # playback_thread = threading.Thread(target=play_audio, args=(audio_queue,))
-    # playback_thread.start()
+    play_audio(audio_queue)   
 
-    # text_to_speech(text, stability, similarity_boost, audio_queue)
-
-    # playback_thread.join()
-    
 def main(args):
     stability = 0.3
     similarity_boost = 0.7
