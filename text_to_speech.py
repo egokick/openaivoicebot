@@ -51,14 +51,14 @@ def play_audio(audio_queue: queue.Queue):
 
     audio_stream.seek(0)
     audio = AudioSegment.from_file(audio_stream, format="mp3")    
-    speedup_factor = 1.2  # Increase this value to make the audio faster
+    speedup_factor = 1 # Increase this value to make the audio faster
     audio = audio.set_frame_rate(int(audio.frame_rate * speedup_factor))
 
     play(audio)
 
 def special_play_audio(text):
     stability = 0.3
-    similarity_boost = 0.9
+    similarity_boost = 0.95
 
     audio_queue = queue.Queue()
 
