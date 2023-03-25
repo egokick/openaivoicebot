@@ -51,30 +51,30 @@ def main():
 
     print("starting...", end="")
 
-    def call_text_to_speech(userTranscript):                
+    def call_text_to_speech(latestTranscript, fullTranscript):
         sentence = ""
-        print("user: " + userTranscript)
-
-        for openai_response in stream_chat_with_gpt(userTranscript):
+        print("user: " + latestTranscript)
+        fullResponse = ""
+        for openai_response in stream_chat_with_gpt(latestTranscript, fullTranscript):
             if(openai_response is None or openai_response == "!|!|TERMINATE!|!|!"):
                 break
             openai_response = openai_response.replace('\n', '')
             openai_response = openai_response.replace('\r', '')
+            fullResponse += openai_response
 
             sentence += openai_response
             word_count = len(sentence.split())
 
             if(word_count > 26 or (len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))):
-                print("ai1: " + sentence)             
+                print("ai: " + sentence)             
                 playaudio(sentence)   
                 sentence = ""
         
         if(len(sentence)> 1):
             print("ai2: " + sentence)  
             playaudio(sentence)
-
-        print("Listening...") 
-        is_muted = False 
+        
+        return fullResponse
                    
     audio_interface = pyaudio.PyAudio()    
     device_info = audio_interface.get_default_input_device_info()
@@ -100,11 +100,16 @@ def main():
     )
 
     # Start transcribing audio from the microphone
+    fullTranscript = [{'role': 'system', 'content':  "You are a helpful assistant secretary, your name is Savvie, you respond with short, concise answers. Stay in character. Do not break character. You are 21 years old. You want to help me. Your favourite thing in the world is your dog, dexter, she is a rescue dog and loves to sleep, she is a chiwawa cross. Do not break character."}]
     while True:
-        userTranscript = transcribe_audio_stream(requests)
 
-        call_text_to_speech(userTranscript)
+        print("Listening...") 
+        userInputText = transcribe_audio_stream(requests)
 
+        botResponse = call_text_to_speech(userInputText, fullTranscript)
+        
+        fullTranscript.append({'role': 'user', 'content': userInputText})
+        fullTranscript.append({'role': 'assistant', 'content': botResponse})
 
 if __name__ == "__main__":
     main()
