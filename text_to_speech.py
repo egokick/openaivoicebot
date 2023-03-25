@@ -41,29 +41,34 @@ def text_to_speech(text: str, stability: float, similarity_boost: float, audio_q
 
 
 def play_audio(audio_queue: queue.Queue):
-    audio_stream = BytesIO()
-    while True:
+    audio_stream = BytesIO()    
+    while True:        
         chunk = audio_queue.get()
         if chunk is None:
             break
+
         audio_stream.write(chunk)
 
     audio_stream.seek(0)
-    audio = AudioSegment.from_file(audio_stream, format="mp3")
+    audio = AudioSegment.from_file(audio_stream, format="mp3")    
     play(audio)
-
 
 def special_play_audio(text):
     stability = 0.7
     similarity_boost = 0.7
 
     audio_queue = queue.Queue()
-    playback_thread = threading.Thread(target=play_audio, args=(audio_queue,))
-    playback_thread.start()
 
     text_to_speech(text, stability, similarity_boost, audio_queue)
+    play_audio(audio_queue)
+    
+    # audio_queue = queue.Queue()
+    # playback_thread = threading.Thread(target=play_audio, args=(audio_queue,))
+    # playback_thread.start()
 
-    playback_thread.join()
+    # text_to_speech(text, stability, similarity_boost, audio_queue)
+
+    # playback_thread.join()
     
 def main(args):
     stability = 0.3
@@ -83,4 +88,5 @@ if __name__ == "__main__":
     parser.add_argument("text", type=str, help="The text to be converted to speech")
     args = parser.parse_args()
 
-    main(args)
+    # Call the special_play_audio function instead of the main function
+    special_play_audio(args.text)

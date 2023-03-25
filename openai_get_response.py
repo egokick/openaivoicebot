@@ -21,10 +21,12 @@ def stream_chat_with_gpt(input_string):
         stream=True  # this time, we set stream=True
     )
 
-    for chunk in response:
+    for chunk in response:        
         if "choices" in chunk:
             for choice in chunk["choices"]:
-                if "delta" in choice and "content" in choice["delta"]:
+                if "finish_reason" in choice and choice["finish_reason"] == "stop":
+                    return "!|!|TERMINATE!|!|!"
+                elif "delta" in choice and "content" in choice["delta"]:
                     yield choice["delta"]["content"] # (choice["delta"]["content"], end="")
 
 # Run function
