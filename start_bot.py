@@ -56,46 +56,45 @@ def main():
         start_time = time.time()
         first_iteration = True
         for openai_response in stream_chat_with_gpt(latestTranscript, fullTranscript):
-            if(openai_response is None or openai_response == "!|!|TERMINATE!|!|!"):
-                break
-            openai_response = openai_response.replace('\n', '')
-            openai_response = openai_response.replace('\r', '')
-            fullResponse += openai_response
+            if openai_response != "!|!|TERMINATE!|!|!":
+                openai_response = openai_response.replace('\n', '')
+                openai_response = openai_response.replace('\r', '')
+                fullResponse += openai_response
 
             sentence += openai_response
             word_count = len(sentence.split())
 
             elapsed_time = time.time() - start_time
 
-            if elapsed_time > 3 or (word_count > 26 or (len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))):
+            first_run = first_iteration and (word_count > 3 and len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))
+            has_sentence = (elapsed_time > 1 and (word_count > 3 and len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))) or (word_count > 50 and (sentence[-1]=='.' or sentence[-2]=='.'))
+
+            if has_sentence or first_run or openai_response == "!|!|TERMINATE!|!|!":
+                sentence = sentence.lstrip()
                 print("ai: " + sentence)
-                get_audio_stream(sentence, audio_stream_queue)                
+                get_audio_stream(sentence, audio_stream_queue)            
                 sentence = ""
-                if first_iteration is False:
-                    audio_thread1.join() # Wait for audio to finish playing
-                    audio_playing.clear()
-            
-                if (first_iteration and not audio_stream_queue.empty()) or (audio_playing.is_set() is False and first_iteration is False):
-                    first_iteration = False
-                    start_time = time.time()
-                    
-                    audio_thread1 = play_audio_stream(audio_stream_queue, audio_playing)
+                
+                if first_iteration is False and audio_playing.is_set():
+                    try:
+                        audio_thread1.join() # Wait for the previous audio to finish playing
+                        audio_playing.clear()                
+                    except:
+                        pass
 
-        if len(sentence) > 1:
-            print("ai2: " + sentence)
-            get_audio_stream(sentence, audio_stream_queue)
-            print("test1")
-            audio_thread1.join()
-            print("test2")
-            audio_thread2 = play_audio_stream(audio_stream_queue, audio_playing)            
-            audio_thread2.join() # Wait for audio to finish playing
-            audio_playing.clear()            
-        else:
-            audio_thread1.join()
-            audio_playing.clear()
-
-        return fullResponse
- 
+                first_iteration = False
+                start_time = time.time()
+                
+                audio_thread1 = play_audio_stream(audio_stream_queue, audio_playing)
+        
+        if audio_playing.is_set():
+            try:
+                audio_thread1.join() # Wait for the previous audio to finish playing
+                audio_playing.clear()                
+            except:
+                pass
+                
+        return fullResponse 
                    
     audio_interface = pyaudio.PyAudio()    
     device_info = audio_interface.get_default_input_device_info()
