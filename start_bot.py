@@ -7,7 +7,7 @@ from openai_get_response import stream_chat_with_gpt
 from text_to_speech import *
 from google.cloud import speech_v1
 from google.cloud.speech_v1 import types
-from google.api_core.exceptions import OutOfRange
+from google.api_core.exceptions import *
 from threading import Timer
 import numpy as np
 
@@ -16,6 +16,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "gcp_credentials.json"
 RATE = 16000 
 CHUNK = int(RATE / 10)  # 100ms
 is_muted = False
+is_response_active = False
 
  
 def transcribe_audio_stream(requests):
@@ -37,7 +38,10 @@ def transcribe_audio_stream(requests):
             for result in response.results:
                 if result.is_final:                    
                     transcript = result.alternatives[0].transcript.strip()                    
-                    return transcript        
+                    return transcript   
+    except Unknown as e:
+        print("Error while transcribing audio stream:", e)
+        return None     
     except OutOfRange:
         pass
     
@@ -46,8 +50,7 @@ def main():
     print("starting...", end="")
 
     def call_text_to_speech(latestTranscript, fullTranscript):
-        sentence = ""
-        print("user: " + latestTranscript)
+        sentence = ""        
         fullResponse = ""
 
         audio_stream_queue = queue.Queue()
@@ -77,7 +80,7 @@ def main():
                 
                 if first_iteration is False and audio_playing.is_set():
                     try:
-                        audio_thread1.join() # Wait for the previous audio to finish playing
+                        audio_thread1.join() # Wait for the previous audio to finish playing before moving on to play the next audio stream
                         audio_playing.clear()                
                     except:
                         pass
@@ -103,6 +106,16 @@ def main():
         rate=RATE, channels=1, format=pyaudio.paInt16, input=True, frames_per_buffer=CHUNK,
     )
 
+    def set_response_active():
+        global is_response_active
+        is_response_active = True
+        # Set the variable to False again after 30 seconds
+        time.sleep(30)
+        is_response_active = False
+    
+    # Run the set_response_active function in a separate thread
+    response_thread = threading.Thread(target=set_response_active)
+
     # check if audio stream is active
     if audio_stream.is_active():
         print(f"Audio stream is open successfully with default device: {device_name}")
@@ -119,18 +132,32 @@ def main():
         for content in audio_generator()
     )
 
+    global is_response_active
     # Start transcribing audio from the microphone
     stats = "{ 'Name': 'Addy', 'Age': '28', 'JobTitle': 'Personal Assistant', 'Personality': 'Friendly, Direct', 'Intelligence': 'Extremely High', 'Traits': 'Good at remembering detail, great social skills', 'Setting': 'home office',  'Job Description': 'Extremely helpful assistant that can do anything.' }"
-    fullTranscript = [{'role': 'system', 'content':  "You are roleplaying as a helpful assistant secretary. Please review your character sheet carefully and play that role. Character sheet: " + stats + ". Please stay in character unless you can't do something or don't have access to something. Ask for my name and always refer to me by name when you are speaking with me."}]
+    fullTranscript = [{'role': 'system', 'content':  "You are roleplaying as a helpful assistant secretary. Please review your character sheet carefully and play that role. Character sheet: " + stats + ". Please stay in character. When we first start speaking, introduce yourself and ask for my name. Always use my name when you are responding to me."}]
     while True:
 
         print("Listening...") 
+    
         userInputText = transcribe_audio_stream(requests)
+        print("user: " + userInputText)
 
-        botResponse = call_text_to_speech(userInputText, fullTranscript)
+        if(is_response_active or "robot" in userInputText.lower()):
+            print("debugdebug")
+            botResponse = call_text_to_speech(userInputText, fullTranscript)
+            fullTranscript.append({'role': 'user', 'content': userInputText})
+            fullTranscript.append({'role': 'assistant', 'content': botResponse})
+            is_response_active = True
+            # if response_thread.is_alive() is False:
+                
+            #     response_thread.start()
+        else:
+            userInputText = ""
+
+        time.sleep(0.1)
+
         
-        fullTranscript.append({'role': 'user', 'content': userInputText})
-        fullTranscript.append({'role': 'assistant', 'content': botResponse})
 
 if __name__ == "__main__":
     main()
