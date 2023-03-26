@@ -17,13 +17,7 @@ RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
 is_muted = False
 
-def generate_sine_wave(frequency=2, duration=1, sample_rate=RATE, volume=1):
-    samples = int(sample_rate * duration)
-    t = np.linspace(0, duration, samples, False)
-    sine_wave = volume * np.sin(frequency * 2 * np.pi * t)
-    audio_data = sine_wave.astype(np.float32).tobytes()
-    return audio_data
-
+ 
 def transcribe_audio_stream(requests):
     client_transcribe = speech_v1.SpeechClient()
     config = types.RecognitionConfig(
@@ -55,6 +49,12 @@ def main():
         sentence = ""
         print("user: " + latestTranscript)
         fullResponse = ""
+
+        audio_stream_queue = queue.Queue()
+        audio_playing = threading.Event()
+
+        start_time = time.time()
+        first_iteration = True
         for openai_response in stream_chat_with_gpt(latestTranscript, fullTranscript):
             if(openai_response is None or openai_response == "!|!|TERMINATE!|!|!"):
                 break
@@ -65,16 +65,37 @@ def main():
             sentence += openai_response
             word_count = len(sentence.split())
 
-            if(word_count > 26 or (len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))):
-                print("ai: " + sentence)             
-                special_play_audio(sentence)   
+            elapsed_time = time.time() - start_time
+
+            if elapsed_time > 3 or (word_count > 26 or (len(sentence) > 2 and (sentence[-1]=='.' or sentence[-2]=='.'))):
+                print("ai: " + sentence)
+                get_audio_stream(sentence, audio_stream_queue)                
                 sentence = ""
-        
-        if(len(sentence)> 1):
-            print("ai2: " + sentence)  
-            special_play_audio(sentence)
-        
+                if first_iteration is False:
+                    audio_thread1.join() # Wait for audio to finish playing
+                    audio_playing.clear()
+            
+                if (first_iteration and not audio_stream_queue.empty()) or (audio_playing.is_set() is False and first_iteration is False):
+                    first_iteration = False
+                    start_time = time.time()
+                    
+                    audio_thread1 = play_audio_stream(audio_stream_queue, audio_playing)
+
+        if len(sentence) > 1:
+            print("ai2: " + sentence)
+            get_audio_stream(sentence, audio_stream_queue)
+            print("test1")
+            audio_thread1.join()
+            print("test2")
+            audio_thread2 = play_audio_stream(audio_stream_queue, audio_playing)            
+            audio_thread2.join() # Wait for audio to finish playing
+            audio_playing.clear()            
+        else:
+            audio_thread1.join()
+            audio_playing.clear()
+
         return fullResponse
+ 
                    
     audio_interface = pyaudio.PyAudio()    
     device_info = audio_interface.get_default_input_device_info()

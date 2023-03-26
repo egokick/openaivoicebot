@@ -33,12 +33,35 @@ def text_to_speech(text: str, stability: float, similarity_boost: float, audio_q
     response = requests.post(API_BASE_URL + ENDPOINT, headers=headers, data=json.dumps(data), stream=True)
 
     if response.status_code == 200:
+        audio_stream = BytesIO()
         for chunk in response.iter_content(chunk_size=4096):
-            audio_queue.put(chunk)
-        audio_queue.put(None)  # Signal the end of the audio stream
+            audio_stream.write(chunk)
+        audio_stream.seek(0)
+        audio_queue.put(audio_stream)
     else:
         raise Exception(f"API call failed with status code {response.status_code} and response text: {response.text}")
 
+def play_audio_stream(audio_stream_queue, audio_playing):
+    while not audio_stream_queue.empty():
+        audio_stream = audio_stream_queue.get()
+        audio = AudioSegment.from_file(audio_stream, format="mp3")
+        speedup_factor = 1  # Increase this value to make the audio faster
+        audio = audio.set_frame_rate(int(audio.frame_rate * speedup_factor))
+
+        audio_playing.set()
+        audio_thread = threading.Thread(target=play, args=(audio, ))
+        audio_thread.start()
+
+        return audio_thread
+
+def get_audio_stream(text, audio_stream_queue):
+    stability = 0.3
+    similarity_boost = 0.95
+
+    tts_thread = threading.Thread(target=text_to_speech, args=(text, stability, similarity_boost, audio_stream_queue))
+    tts_thread.start()
+
+    tts_thread.join()  # Wait for the text_to_speech thread to finish
 
 def play_audio(audio_queue: queue.Queue):
     audio_stream = BytesIO()    
