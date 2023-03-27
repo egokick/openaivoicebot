@@ -63,8 +63,8 @@ def main():
                 openai_response = openai_response.replace('\n', '')
                 openai_response = openai_response.replace('\r', '')
                 fullResponse += openai_response
+                sentence += openai_response
 
-            sentence += openai_response
             word_count = len(sentence.split())
 
             elapsed_time = time.time() - start_time
@@ -104,17 +104,7 @@ def main():
     device_name = device_info["name"]
     audio_stream = audio_interface.open(
         rate=RATE, channels=1, format=pyaudio.paInt16, input=True, frames_per_buffer=CHUNK,
-    )
-
-    def set_response_active():
-        global is_response_active
-        is_response_active = True
-        # Set the variable to False again after 30 seconds
-        time.sleep(30)
-        is_response_active = False
-    
-    # Run the set_response_active function in a separate thread
-    response_thread = threading.Thread(target=set_response_active)
+    ) 
 
     # check if audio stream is active
     if audio_stream.is_active():
@@ -131,27 +121,30 @@ def main():
         speech_v1.StreamingRecognizeRequest(audio_content=content)
         for content in audio_generator()
     )
+ 
+    last_call_time = time.time()  # Initialize timestamp variable
 
     global is_response_active
+    first_iteration = True
     # Start transcribing audio from the microphone
     stats = "{ 'Name': 'Addy', 'Age': '28', 'JobTitle': 'Personal Assistant', 'Personality': 'Friendly, Direct', 'Intelligence': 'Extremely High', 'Traits': 'Good at remembering detail, great social skills', 'Setting': 'home office',  'Job Description': 'Extremely helpful assistant that can do anything.' }"
-    fullTranscript = [{'role': 'system', 'content':  "You are roleplaying as a helpful assistant secretary. Please review your character sheet carefully and play that role. Character sheet: " + stats + ". Please stay in character. When we first start speaking, introduce yourself and ask for my name. Always use my name when you are responding to me."}]
+    fullTranscript = [{'role': 'system', 'content':  "After I say 'Hello', introduce yourself, ask for my name, then say 'You can speak to me by saying Hey Robot'. You are roleplaying as a helpful assistant secretary. Please review your character sheet carefully and play the role. Character sheet: " + stats + ". Please stay in character. Always respond to people by name."}]
     while True:
+   
+        if not first_iteration:
+            print("Listening...") 
+            userInputText = transcribe_audio_stream(requests)
+            print("user: " + userInputText)
+        else:            
+            userInputText = "Hello."
 
-        print("Listening...") 
-    
-        userInputText = transcribe_audio_stream(requests)
-        print("user: " + userInputText)
-
-        if(is_response_active or "robot" in userInputText.lower()):
-            print("debugdebug")
+        time_since_last_call = time.time() - last_call_time        
+        if(first_iteration or time_since_last_call <= 30.0 or "robot" in userInputText.lower()):
+            first_iteration = False
             botResponse = call_text_to_speech(userInputText, fullTranscript)
+            last_call_time = time.time()
             fullTranscript.append({'role': 'user', 'content': userInputText})
-            fullTranscript.append({'role': 'assistant', 'content': botResponse})
-            is_response_active = True
-            # if response_thread.is_alive() is False:
-                
-            #     response_thread.start()
+            fullTranscript.append({'role': 'assistant', 'content': botResponse})            
         else:
             userInputText = ""
 

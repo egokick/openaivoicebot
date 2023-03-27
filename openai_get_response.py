@@ -26,7 +26,7 @@ def stream_chat_with_gpt(input_string, fullTranscript):
         if "choices" in chunk:
             for choice in chunk["choices"]:
                 if "finish_reason" in choice and choice["finish_reason"] == "stop":
-                    return "!|!|TERMINATE!|!|!"
+                    yield "!|!|TERMINATE!|!|!"
                 elif "delta" in choice and "content" in choice["delta"]:
                     yield choice["delta"]["content"] # (choice["delta"]["content"], end="")
 
