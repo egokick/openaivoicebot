@@ -18,6 +18,11 @@ you won't have access to the voiceId I'm using for eleven labs. So you'll need t
 python start_bot.py
 ```
 
+# Run the bot with voice disabled
+
+```
+python start_bot.py --disable-voice
+```
 
 
 # Misc
