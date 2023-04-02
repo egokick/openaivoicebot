@@ -11,7 +11,7 @@ import json
 with open('creds.json') as f:
     creds = json.load(f)
 
-VOICE_ID = "q4NcZ1UIsrVIO7oAFQc5" # cara "ZM3cm9AU0Fbq9tiQUoKZ"
+VOICE_ID =  "ErXwobaYiN019PkySvjV" # addy "q4NcZ1UIsrVIO7oAFQc5" # cara "ZM3cm9AU0Fbq9tiQUoKZ"
 API_KEY = creds['ELEVEN_LABS_API_KEY'] 
 API_BASE_URL = "https://api.elevenlabs.io"
 ENDPOINT = f"/v1/text-to-speech/{VOICE_ID}/stream"
@@ -55,8 +55,8 @@ def play_audio_stream(audio_stream_queue, audio_playing):
         return audio_thread
 
 def get_audio_stream(text, audio_stream_queue):
-    stability = 0.3
-    similarity_boost = 0.95
+    stability = 0.7
+    similarity_boost = 0.8
 
     tts_thread = threading.Thread(target=text_to_speech, args=(text, stability, similarity_boost, audio_stream_queue))
     tts_thread.start()

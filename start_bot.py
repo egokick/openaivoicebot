@@ -4,6 +4,7 @@ import subprocess
 import argparse
 import time
 import pyaudio
+from ai_execute_functions import *
 from openai_get_response import stream_chat_with_gpt
 from text_to_speech_eleven_labs import *
 import text_to_speech_windows
@@ -44,7 +45,17 @@ def transcribe_audio_stream(requests):
     except OutOfRange:
         pass
     
-def call_text_to_speech(latestTranscript, fullTranscript, use_local_voice, audio_stream):
+def speak_sentence(sentence):
+    print("ai: " + sentence)
+    audio_stream_queue = queue.Queue()
+    audio_playing = threading.Event()
+
+    get_audio_stream(sentence, audio_stream_queue)      
+    audio_thread1 = play_audio_stream(audio_stream_queue, audio_playing)
+    audio_thread1.join() 
+    audio_playing.clear()
+
+def stream_gpt_and_play_speech(latestTranscript, fullTranscript, use_local_voice, audio_stream):
         sentence = ""        
         fullResponse = ""
 
@@ -110,26 +121,26 @@ def audio_generator(audio_stream):
 
 def start_bot(requests, audio_stream, bot_name, use_local_voice, alwaysListen):
 
-    folder_path = 'chathistory'
-    file_name = bot_name + '.json'
-    file_path = os.path.join(folder_path, file_name)
+    # folder_path = 'chathistory'
+    # file_name = bot_name + '.json'
+    # file_path = os.path.join(folder_path, file_name)
 
-    # Check if the folder exists, if not, create it
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    # # Check if the folder exists, if not, create it
+    # if not os.path.exists(folder_path):
+    #     os.makedirs(folder_path)
 
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as file:
-            pass  # Just create the file, don't write anything
+    # if not os.path.exists(file_path):
+    #     with open(file_path, 'w') as file:
+    #         pass  # Just create the file, don't write anything
     
     stats = "{ 'Name': 'Addy', 'Age': '28', 'JobTitle': 'Personal Assistant', 'Personality': 'Friendly, Direct', 'Intelligence': 'Extremely High', 'Traits': 'Good at remembering detail, great social skills', 'Setting': 'home office',  'Job Description': 'Extremely helpful assistant that can do anything.' }"
-    fullTranscript = [{'role': 'system', 'content':  "You are a helpful assistant secretary.  Please review your character sheet and play the role. Character sheet: " + stats + ". Please stay in character. Introduce yourself, ask for my name."}]
+    fullTranscript = [{'role': 'system', 'content':  "You are a helpful assistant secretary.  Please review your character sheet and play the role. Character sheet: " + stats + ". Please stay in character. When people say hi or Hello, just respond with 'Hi' and nothing else."}]
 
-    with open(file_path, 'r') as file:
-        file_contents = file.readlines()
-        if file_contents:        
-            for line in file_contents:
-                fullTranscript.append(json.loads(line.strip()))
+    # with open(file_path, 'r') as file:
+    #     file_contents = file.readlines()
+    #     if file_contents:        
+    #         for line in file_contents:
+    #             fullTranscript.append(json.loads(line.strip()))
 
     last_call_time = time.time()  # Initialize timestamp variable
     first_iteration = True
@@ -146,15 +157,76 @@ def start_bot(requests, audio_stream, bot_name, use_local_voice, alwaysListen):
         time_since_last_call = time.time() - last_call_time        
 
         if(alwaysListen or first_iteration or time_since_last_call <= 30.0 or "robot" in userInputText.lower()):
-            first_iteration = False
-            botResponse = call_text_to_speech(userInputText, fullTranscript, use_local_voice, audio_stream)
-            last_call_time = time.time()
-            fullTranscript.append({'role': 'user', 'content': userInputText})
-            fullTranscript.append({'role': 'assistant', 'content': botResponse})
+            if not first_iteration:
+                requiresCode = user_response_requires_code(userInputText)
+                if(requiresCode):
+                    print("requires code: ",  requiresCode)
+                    goals = get_goals_from_user_requirements(userInputText)
+                    
+                    goal_info = {key: '' for key in goals}
+                    for i, goal in enumerate(goals, start=1):
+                        print(f"{i}. {goal}")             
+                        
+                        requires_more_info = does_goal_require_more_info(goal + userInputText)
+                        print(f"goal {i} requires_more_info: ", requires_more_info)
 
-            with open(file_path, 'a') as file:
-                file.write(json.dumps({'role': 'user', 'content': userInputText}) + '\n')
-                file.write(json.dumps({'role': 'assistant', 'content': botResponse}) + '\n')
+                        if(requires_more_info):
+                            speak_sentence("GATHERING INFO")
+                            # print(f"GENERATING QUESTION TO GET MORE INFO FOR GOAL {i}.")
+                            question = get_question_to_get_more_info(goal)
+                            print("QUESTION: " + question)
+
+                            speak_sentence("ASKING SOFTWARE ENGINEER")
+                            software_engineer_response = get_software_engineer_response_to_question(question)
+                            print("SOFTWARE ENGINEER RESPONSE: " + software_engineer_response)
+                                                        
+                            has_answered_question = has_question_been_answered(question, software_engineer_response)
+                            print("debug has_answered_question: ", has_answered_question)
+                            if has_answered_question:
+                                goal_info[goal] = software_engineer_response
+                            else:                                
+                                speak_sentence("SOFTWARE ENGINEER UNABLE TO ANSWER... " + question) #Ask questions to the user
+                                userResponse = transcribe_audio_stream(requests)
+                                goal_info[goal] = userResponse
+                                print(f"{i} {goal}: {goal_info[goal]}")                      
+
+                    print("FINISHED GATHERING REQUIREMENTS.")
+                    print("CONFIRM WITH USER IF THIS IS WHAT THEY WANT")
+                    goal_summary = summarize_goals(goal_info)
+                    question = "Is this what you want: " + goal_summary + "... respond yes if you want this. Respond no, if you do not."
+                    speak_sentence(question)
+                    userResponse = transcribe_audio_stream(requests)
+                    has_confirmation = user_confirmation(userResponse)
+                    if(has_confirmation):
+                        speak_sentence("Thank you for confirming, I will now begin working on this. I will keep you updated with progress.")
+                        ## Implement each goal
+                        print("IMPLEMENTING REQUIREMENTS...")
+                        speak_sentence("IMPLEMENTING REQUIREMENTS.")
+                    else:
+                        speak_sentence("Sorry I did not accurately understand your requirements...")
+                        print("todo: implement refinement process")
+
+                
+                    for i, goal in enumerate(goals, start=1):
+                        # has goal been implemented?
+                        print("TEST TEST TEST")
+                        ## Generate a sub list 
+                        ## generate code
+                        ## write tests to validate code
+                        ## 
+
+                elif (not requiresCode):
+                    print("requires code: ", requiresCode)
+
+            first_iteration = False
+            botResponse = stream_gpt_and_play_speech(userInputText, fullTranscript, use_local_voice, audio_stream)
+            last_call_time = time.time()
+            # fullTranscript.append({'role': 'user', 'content': userInputText})
+            # fullTranscript.append({'role': 'assistant', 'content': botResponse})
+            
+            # with open(file_path, 'a') as file:
+            #     file.write(json.dumps({'role': 'user', 'content': userInputText}) + '\n')
+            #     file.write(json.dumps({'role': 'assistant', 'content': botResponse}) + '\n')
 
         else:
             userInputText = ""
@@ -183,7 +255,7 @@ def main(use_local_voice):
         for content in audio_generator(audio_stream)
     )
  
-    start_bot(requests, audio_stream, bot_name="Addy", use_local_voice=True, alwaysListen=False)
+    start_bot(requests, audio_stream, bot_name="Addy", use_local_voice=use_local_voice, alwaysListen=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process command line arguments")
